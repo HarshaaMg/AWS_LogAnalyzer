@@ -1,0 +1,35 @@
+
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: log-analyzer-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-local-secret-key-for-development}
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/local_storage:/app/local_storage
+    restart: unless-stopped
+    networks:
+      - log-analyzer-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: log-analyzer-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - log-analyzer-network
+
+networks:
+  log-analyzer-network:
+    driver: bridge
