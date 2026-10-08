@@ -1,148 +1,181 @@
-# AWS Cloud Log Analyzer
+# Real-Time Linux Observability, Log Analytics & Auto-Scaling Platform
+*(Formerly AWS Cloud Log Analyzer)*
 
-A production-ready, full-stack log monitoring and analysis platform built with Flask, React, Docker, and AWS services. It helps teams collect logs, analyze severity patterns, surface critical issues, and monitor system health through a responsive dashboard.
+A production-ready, full-stack Linux infrastructure observability, log monitoring, and autonomous scaling platform built with Flask, React, Docker, and VMware/AWS virtualization. It continuously monitors Linux virtual machines (CPU, Memory, Disk, Load Average, Disk I/O), parses streaming logs, and automatically provisions new virtual machines when sustained resource constraints are detected.
 
-![Architecture](https://img.shields.io/badge/Stack-Flask%20%2B%20React%20%2B%20AWS-blue)
+![Stack](https://img.shields.io/badge/Stack-Flask%20%2B%20React%20%2B%20VMware%20%2B%20AWS-blue)
 ![Docker](https://img.shields.io/badge/Deployment-Docker%20Compose-green)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-yellow)
 ![Node](https://img.shields.io/badge/Node.js-18%2B-lightgrey)
+![Streaming](https://img.shields.io/badge/Streaming-Kafka%20%2F%20In--Memory-orange)
 
 ---
 
 ## Overview
 
-AWS Cloud Log Analyzer is designed to simplify observability for applications and infrastructure by combining:
+The platform combines real-time infrastructure telemetry, statistical anomaly detection, and automated scaling controllers:
 
-- log ingestion and parsing,
-- real-time severity analysis,
-- alert generation,
-- dashboard-based monitoring,
-- and cloud deployment support.
-
-It supports both local development workflows and AWS-native deployments, making it suitable for demos, internal tools, and deployment experiments.
+- **Linux VM Monitoring**: Continuous Prometheus Node Exporter metrics (CPU, RAM, Disk, Load, I/O) and Fluent Bit log shipping.
+- **Autonomous VM Provisioning**: Decoupled multi-cloud scaling engine supporting **VMware vSphere** (Layer 1 Development) and **AWS EC2** (Layer 2 Production).
+- **Anti-Spike Protection**: 5-minute sliding window prevents premature scale-ups on transient spikes.
+- **Dynamic Registration & Heartbeats**: VMs self-register on boot with cloud-init and maintain health beacons.
+- **Workload Scheduler**: Routes tasks to the "least-utilized healthy VM".
+- **Log Analytics Subsystem**: Preserves full AWS Cloud Log Analyzer functionality (DynamoDB/local storage, JWT auth, severity classification, and charts).
 
 ---
 
 ## Key Features
 
-- Log ingestion from uploaded files and manual input
-- Severity-based parsing for INFO, WARNING, ERROR, and CRITICAL logs
-- Dashboard with summary cards, charts, search, and filters
-- Alert creation for critical and error events
-- JWT-based authentication
-- Local storage mode for development
-- AWS storage mode with DynamoDB, CloudWatch, Lambda, and SNS integration
-- Docker Compose support for containerized deployment
-- Dark mode support and responsive UI
-- CSV export for logs
+- **Continuous Linux Telemetry**: Scrapes Node Exporter and Fluent Bit across all cluster VMs
+- **Autonomous Auto-Scaling**: Multi-threshold sustained evaluation with cooldown and safety locks
+- **Multi-Cloud Provisioning Abstraction**: Supports both VMware virtual machines and AWS EC2 instances
+- **Dual Storage Mode**: Local file/JSON mode for offline dev and AWS mode (DynamoDB, CloudWatch, SNS, Lambda)
+- **Workload Balancer**: Dispatches incoming workloads to the least-utilized healthy host
+- **Interactive Dashboard**: Tabbed interface for Observability & Auto-Scaling and Log Analytics & Alerts
+- **Platform Self-Health**: Dedicated `/api/system/health` telemetry endpoint
+- **Docker Compose & Terraform**: Ready for local containerized deployment and automated cloud provisioning
 
 ---
 
-## Project Architecture
+## End-to-End System Architecture
 
-```text
-User Browser
-    │
-    ▼
-React Frontend
-    │
-    ▼
-Flask Backend
-    │
-    ├── Local Storage Mode
-    │     ├── backend/logs/
-    │     └── backend/local_storage/
-    │
-    └── AWS Storage Mode
-          ├── DynamoDB
-          ├── CloudWatch Logs
-          └── SNS
+```mermaid
+flowchart TB
+    subgraph Infrastructure["Virtualization & Cloud Infrastructure"]
+        VMware["VMware vSphere / Workstation (Layer 1 Dev)<br/>• Linux VM 01 (Ubuntu 22.04)<br/>• Node Exporter :9100<br/>• Fluent Bit Agent"]
+        AWS_EC2["AWS EC2 Instances (Layer 2 Prod)<br/>• Linux Worker Instances<br/>• Cloud-Init Bootstrap<br/>• IAM Instance Profile"]
+    end
+
+    subgraph Streaming["Streaming Pipeline & Message Bus"]
+        Kafka["Kafka / Redpanda Broker<br/>Topic: 'linux-metrics'<br/>Topic: 'linux-logs'"]
+        MemBuffer["Resilient Circuit Breaker:<br/>In-Memory Circular Buffer (5,000 items)"]
+    end
+
+    subgraph Processing["Statistical Stream Processor"]
+        SP["StreamProcessor (sliding window)<br/>• 5-min rolling averages<br/>• Transient spike filtering<br/>• Sustained shortage flag"]
+    end
+
+    subgraph Decision["Autonomous Decision Engine"]
+        DE["Decision Engine<br/>• CPU > 90% (5 min)<br/>• Cooldown Enforcer (300s)<br/>• Concurrency Lock<br/>• Min: 1 / Max: 5 VMs<br/>• Dry-Run Mode"]
+    end
+
+    subgraph Scaling["Scaling Controller & Provisioners"]
+        SC["Scaling Controller"]
+        VP_VMware["VMwareProvisioner (Cloning FSM)"]
+        VP_AWS["AWSProvisioner (Boto3 ec2.run_instances)"]
+    end
+
+    subgraph Control_Plane["Application & Storage Layer"]
+        API["Flask REST API Engine (:5000)<br/>• Host Registry & Watchdog<br/>• Metrics & Scaling Endpoints"]
+        WS["Workload Scheduler (Least-Utilized)"]
+        Storage[("Dual Storage:<br/>Local JSON / DynamoDB")]
+    end
+
+    subgraph Frontend["Presentation Layer"]
+        UI["React 18 SPA Dashboard (:3000 / :80)<br/>• Linux Observability Panel<br/>• Log Analytics & Alerts Panel"]
+    end
+
+    VMware & AWS_EC2 -->|Metrics & Logs| Kafka
+    Kafka -.->|Fallback if Offline| MemBuffer
+    Kafka & MemBuffer --> SP
+    SP --> DE
+    DE -->|Trigger Scale-Up| SC
+    SC --> VP_VMware & VP_AWS
+    VP_VMware -->|Deploy Clone| VMware
+    VP_AWS -->|Launch Instance| AWS_EC2
+    API <--> Storage
+    SC --> API
+    WS <--> API
+    UI <-->|JWT Authenticated REST| API
 ```
 
 ---
 
 ## Tech Stack
 
-### Backend
-- Python 3.11+
-- Flask
-- Flask-JWT-Extended
-- Flask-CORS
-- boto3
-- python-dotenv
-- Gunicorn
+### Core & Virtualization
+- **Operating System**: Linux (Ubuntu 22.04 LTS / Debian)
+- **Virtualization**: VMware vSphere / Workstation & AWS EC2
+- **Language**: Python 3.11+ / 3.12+
+- **Backend Framework**: Flask 3.0, Flask-JWT-Extended, Flask-CORS
+- **WSGI / Server**: Gunicorn 21.2
+
+### Observability & Streaming
+- **System Metrics**: Prometheus Node Exporter (Kernel `/proc` scraper)
+- **Log Collection**: Fluent Bit (Tail `/var/log/syslog`, `/var/log/auth.log`)
+- **Streaming Bus**: Apache Kafka / Redpanda (with automatic in-memory ring-buffer fallback)
+- **Stream Processing**: Multi-threaded rolling window statistical aggregator
+
+### Cloud & Infrastructure as Code
+- **AWS SDK**: Boto3 (EC2, DynamoDB, CloudWatch Logs, SNS)
+- **Infrastructure as Code**: Terraform (~> 5.0)
+- **Containers**: Docker & Docker Compose
+- **Web Server / Reverse Proxy**: Nginx
 
 ### Frontend
-- React 18
-- React Router
-- Axios
-- Tailwind CSS
-- Chart.js
-- Lucide React
-
-### Infrastructure & Deployment
-- Docker
-- Docker Compose
-- Nginx
-- Terraform
-- AWS Lambda
-- AWS CloudWatch
-- AWS SNS
-- AWS DynamoDB
+- **Framework**: React 18.2 SPA
+- **Styling**: Tailwind CSS
+- **Data Visualization**: Chart.js 4.4 & React-Chartjs-2
+- **Icons**: Lucide React
+- **HTTP Client**: Axios
 
 ---
 
 ## Repository Structure
 
 ```text
-aws-log-analyzer/
+AWS_LogAnalyzer/
 ├── backend/
-│   ├── app.py
-│   ├── aws_storage_adapter.py
-│   ├── dummy_log_generator.py
-│   ├── local_log_reader.py
-│   ├── notification_service.py
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── local_storage/
-│       ├── alerts.json
-│       └── stats.json
+│   ├── app.py                         # Upgraded Flask entrypoint & background supervisor
+│   ├── local_storage_manager.py       # Thread-safe atomic JSON storage manager
+│   ├── aws_storage_adapter.py         # DynamoDB, CloudWatch & SNS adapter
+│   ├── notification_service.py        # Email, SMS & structured scaling alert engine
+│   ├── storage_factory.py             # Storage mode factory (Local vs AWS)
+│   ├── requirements.txt               # Backend Python dependencies
+│   ├── Dockerfile                     # Backend container definition
+│   ├── test_auto_scaling.py           # E2E test harness & interview demonstration
+│   ├── models/
+│   │   └── entities.py                # Data models for Hosts, Metrics, Incidents, Jobs
+│   ├── routes/
+│   │   ├── hosts_bp.py                # /api/hosts, registration & heartbeats
+│   │   ├── metrics_bp.py              # /api/resources & metric ingestion
+│   │   ├── scaling_bp.py              # /api/scaling, incidents & provisioning
+│   │   └── health_bp.py               # /api/system/health self-observability
+│   ├── streaming/
+│   │   ├── event_stream.py            # Kafka/Redpanda & in-memory event bus
+│   │   └── stream_processor.py        # 5-minute sliding window metric aggregator
+│   ├── scaling/
+│   │   ├── decision_engine.py         # Sustained threshold checks, cooldown & limits
+│   │   ├── scaling_controller.py      # Provisioning orchestrator & state machine
+│   │   └── workload_scheduler.py      # Least-utilized healthy VM scheduler
+│   ├── provisioners/
+│   │   ├── base.py                    # VMProvisioner abstract interface
+│   │   ├── vmware_provisioner.py      # Layer 1: VMware lifecycle orchestrator
+│   │   ├── aws_provisioner.py         # Layer 2: AWS EC2 Boto3 provisioner
+│   │   └── factory.py                 # Provisioner factory
+│   └── agents/
+│       ├── node_exporter_collector.py # Node Exporter Prometheus metric parser
+│       ├── fluent_bit_parser.py       # Linux syslog/auth.log security parser
+│       └── vm_template_init.sh        # Linux cloud-init bootstrap script
+│
 ├── frontend/
-│   ├── public/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Dashboard.js
-│   │   │   └── Login.js
-│   │   ├── App.js
-│   │   ├── App.css
-│   │   ├── index.css
+│   │   │   ├── LinuxObservability.js  # Cluster overview, host table, charts, scaling panels
+│   │   │   ├── Dashboard.js           # Main container with tabbed switching
+│   │   │   └── Login.js               # JWT login component
+│   │   ├── App.js                     # Root component & theme provider
 │   │   └── index.js
-│   ├── package.json
 │   ├── Dockerfile
-│   ├── nginx.conf
-│   └── tailwind.config.js
-├── cloudwatch/
-│   ├── cloudwatch_sender.py
-│   ├── log_generator.py
-│   ├── setup_aws_resources.py
-│   └── requirements.txt
-├── lambda/
-│   └── log_processor.py
+│   └── package.json
+│
 ├── terraform/
-│   ├── main.tf
-│   ├── outputs.tf
-│   └── variables.tf
-├── deploy/
-│   ├── deploy_ec2.sh
-│   ├── lambda_deploy.sh
-│   ├── setup_ec2.sh
-│   └── nginx.conf
-├── docker-compose.yml
-├── generate_logs.py
-├── populate_dynamodb.py
-├── PROJECT_DOCUMENTATION.md
-├── PROJECT_DESCRIPTION_AND_EDGE_CASES.md
-└── README.md
+│   ├── main.tf                        # DynamoDB tables, EC2 SG, IAM roles, Lambda
+│   ├── variables.tf                   # min_instances, max_instances, instance_type
+│   └── outputs.tf
+├── docker-compose.yml                 # Multi-container orchestration
+├── README.md                          # Repository overview & quick start
+└── PROJECT_DOCUMENTATION.md           # Master technical documentation
 ```
 
 ---
@@ -150,336 +183,164 @@ aws-log-analyzer/
 ## Getting Started
 
 ### Prerequisites
-
-Make sure the following are installed:
-
-- Python 3.11+
-- Node.js 18+
-- Docker Desktop (optional, for containerized deployment)
-- AWS CLI and credentials (optional, for AWS mode)
+- Python 3.11+ (Python 3.12 supported)
+- Node.js 18+ and npm
+- Docker Desktop (optional for containerized deployment)
+- AWS CLI & credentials (optional for AWS mode)
 
 ---
 
 ## Local Development Setup
 
 ### 1. Clone the repository
-
 ```bash
 git clone <repo-url>
-cd aws-log-analyzer
+cd AWS_LogAnalyzer
 ```
 
-### 2. Create environment variables
-
-Create a `.env` file in the project root if needed.
-
-Example:
-
+### 2. Configure Environment Variables
+Create a `.env` file in the root or `backend/` directory:
 ```env
-JWT_SECRET_KEY=local-secret-key
+JWT_SECRET_KEY=local-secret-key-for-development
 STORAGE_MODE=local
-AWS_REGION=us-east-1
+PROVISIONER_TYPE=vmware
+AUTO_SCALING_ENABLED=true
+DRY_RUN_MODE=true
+MIN_VM_COUNT=1
+MAX_VM_COUNT=5
+COOLDOWN_PERIOD=300
+CPU_CRITICAL_THRESHOLD=90.0
+MEM_CRITICAL_THRESHOLD=90.0
 ```
 
-### 3. Install backend dependencies
-
+### 3. Install & Start Backend
 ```bash
 cd backend
 pip install -r requirements.txt
-```
-
-### 4. Install frontend dependencies
-
-```bash
-cd ../frontend
-npm install
-```
-
-### 5. Start the backend
-
-```bash
-cd ../backend
 python app.py
 ```
+*Backend runs at: `http://127.0.0.1:5000`*
 
-The backend will run at:
-
-- http://127.0.0.1:5000
-
-### 6. Start the frontend
-
+### 4. Install & Start Frontend
 In a new terminal:
-
 ```bash
 cd frontend
+npm install
 npm start
 ```
+*Frontend runs at: `http://127.0.0.1:3000`*
 
-The frontend will run at:
+### 5. Access the Platform
+- Open your browser to `http://localhost:3000`
+- Login using demo credentials:
+  - **Username**: `admin`
+  - **Password**: `admin123`
+- Switch between tabs:
+  - **Observability & Auto-Scaling**: Live Linux telemetry, VM table, scaling controls, incident tracker
+  - **Log Analytics & Alerts**: Log search, filters, pie/line charts, and file upload
 
-- http://127.0.0.1:3000
+---
 
-### 7. Login
+## Running the End-to-End Simulation Harness
 
-Use the demo credentials:
+To verify the complete autonomous auto-scaling pipeline without waiting for live hardware alerts, run:
 
-- Username: admin
-- Password: admin123
+```bash
+cd backend
+python test_auto_scaling.py
+```
+
+This verifies:
+1. Cluster initialization (1 active Linux VM).
+2. Anti-spike filtering (transient 95% CPU spike ignored).
+3. Sustained multi-sample saturation across sliding window.
+4. Decision Engine threshold and cooldown validation.
+5. Provisioner execution and lifecycle step logging.
+6. Guest VM self-registration via `POST /api/hosts/register`.
+7. Heartbeat reception and health promotion to `ACTIVE`.
+8. Workload Scheduler rebalancing task to the new VM.
+
+---
+
+## Complete API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/login` | User authentication; returns JWT access token |
+| `GET` | `/api/hosts` | List all registered Linux hosts with status and utilization |
+| `GET` | `/api/hosts/{id}` | Retrieve details of a specific host |
+| `POST` | `/api/hosts/register` | Linux VM self-registration endpoint |
+| `POST` | `/api/hosts/{id}/heartbeat`| Periodic heartbeat beacon from guest agent |
+| `GET` | `/api/resources` | Cluster-wide aggregated metrics (mean CPU, RAM, disk, load) |
+| `GET` | `/api/resources/{type}` | Time-series metric history (`cpu`, `memory`, `disk`, `load`, `io`) |
+| `POST` | `/api/metrics/ingest` | Telemetry ingestion endpoint for Node Exporter |
+| `GET` | `/api/scaling/status` | Current scaling state, cooldown remaining, min/max limits |
+| `GET` | `/api/scaling/history` | Historical audit log of scale-up and scale-down actions |
+| `POST` | `/api/scaling/scale-up` | Administrator manual scale-up trigger |
+| `POST` | `/api/scaling/scale-down`| Administrator manual scale-down trigger |
+| `GET` | `/api/incidents` | Complete incident log |
+| `GET` | `/api/incidents/active` | Currently active critical alarms |
+| `GET` | `/api/provisioning` | List all VM provisioning jobs and progress steps |
+| `GET` | `/api/provisioning/{id}` | Status of a specific provisioning task |
+| `POST` | `/api/workloads/assign` | Dispatches task to least-utilized healthy VM |
+| `POST` | `/api/workloads/release` | Releases workload counter on a host |
+| `GET` | `/api/system/health` | Observability of the observability platform itself |
+| `GET` | `/api/logs` | Query stored logs (supports `severity` filter) |
+| `POST` | `/api/logs` | Ingest manual log entry |
+| `POST` | `/api/upload` | Upload `.log`, `.txt`, or `.json` file for parsing |
+| `GET` | `/api/alerts` | Query active and historical alerts |
+| `GET` | `/api/stats` | Retrieve log summary statistics |
+| `POST` | `/api/stats/refresh` | Recalculate summary metrics |
+| `GET` | `/api/health` | Legacy health check endpoint |
 
 ---
 
 ## Docker Deployment
 
-### Build and run with Docker Compose
+To launch the full containerized environment with Docker Compose:
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build
 ```
 
-### Stop containers
+- **Frontend**: `http://localhost:80`
+- **Backend API**: `http://localhost:5000`
 
-```bash
-docker compose down
+---
+
+## Interview Orientation: "What Happens When CPU Reaches 95%?"
+
 ```
-
-### Access services
-
-- Frontend: http://localhost:80
-- Backend: http://localhost:5000
-
----
-
-## AWS Deployment
-
-The project includes deployment assets for AWS-based usage.
-
-### AWS services used
-
-- DynamoDB for log and alert storage
-- CloudWatch Logs for log collection
-- Lambda for processing
-- SNS for notifications
-- IAM and EC2 for infrastructure deployment
-
-### Optional setup steps
-
-```bash
-cd cloudwatch
-pip install -r requirements.txt
-python setup_aws_resources.py
+Linux VM (Node Exporter)
+        ↓
+Metrics Ingestion (/api/metrics/ingest)
+        ↓
+EventStream (Kafka / In-Memory Bus)
+        ↓
+StreamProcessor (5-Min Sliding Window)
+        ↓
+Anti-Spike Filter (Transient spike discarded)
+        ↓
+Sustained Saturation (CPU > 90% for 5 min)
+        ↓
+Decision Engine (Checks: Auto-Scaling, Cooldown, Scaling Lock, Max VMs)
+        ↓
+Scaling Controller (Acquires lock, triggers provisioner)
+        ↓
+VMProvisioner (VMware Template Clone or AWS EC2 run_instances)
+        ↓
+New VM Boots (Executes vm_template_init.sh via Cloud-Init)
+        ↓
+Guest Self-Registration (POST /api/hosts/register)
+        ↓
+Heartbeat Watchdog (First heartbeat acknowledged → Status = ACTIVE)
+        ↓
+Workload Scheduler (Assigns incoming tasks to new least-utilized VM)
+        ↓
+Audit Log & Notification (Recorded in CloudScalingEvents, alert sent via SNS/Email)
 ```
-
----
-
-## API Overview
-
-### Authentication
-
-- POST /api/login
-- Requires username and password
-
-### Core endpoints
-
-- GET /api/logs
-- POST /api/logs
-- POST /api/upload
-- GET /api/alerts
-- GET /api/stats
-- POST /api/stats/refresh
-- GET /api/health
-
-### Example
-
-```bash
-curl http://127.0.0.1:5000/api/health
-```
-
----
-
-## Dashboard Features
-
-The dashboard includes:
-
-- total log counters,
-- error and warning summaries,
-- critical event counts,
-- pie charts and line charts,
-- log search,
-- severity filters,
-- upload modal,
-- CSV export,
-- and refresh controls.
-
----
-
-## Usage Examples
-
-### Generate sample logs
-
-```bash
-cd cloudwatch
-python log_generator.py 100
-```
-
-### Upload a log file
-
-Use the upload button in the dashboard to upload a .log, .txt, or .json file.
-
-### Manual log entry
-
-You can add a log directly through the API using a POST request to /api/logs.
-
----
-
-## Configuration
-
-### Environment variables
-
-| Variable | Purpose | Default |
-|---|---|---|
-| JWT_SECRET_KEY | Secret key for JWT tokens | local-secret-key |
-| STORAGE_MODE | local or aws | local |
-| AWS_REGION | AWS region for cloud operations | us-east-1 |
-| SNS_TOPIC_ARN | SNS topic ARN for alerts | none |
-| SMTP_SERVER | SMTP server for email alerts | smtp.gmail.com |
-| SMTP_USERNAME | SMTP username | empty |
-| SMTP_PASSWORD | SMTP password | empty |
-| ALERT_EMAIL | Recipient email for alerts | configured email |
-
----
-
-## Edge Cases and Reliability Notes
-
-The project already includes handling for several edge cases, including:
-
-- invalid login attempts,
-- missing auth tokens,
-- unsupported file uploads,
-- malformed log lines,
-- missing storage files,
-- AWS credential issues,
-- docker daemon unavailability,
-- and empty or no-result dashboards.
-
-For a detailed breakdown, see [PROJECT_DESCRIPTION_AND_EDGE_CASES.md](PROJECT_DESCRIPTION_AND_EDGE_CASES.md).
-
----
-
-## Development Notes
-
-Recommended next improvements:
-
-- add unit and integration tests,
-- implement proper database-backed auth,
-- add alert deduplication,
-- improve error handling and logging,
-- add rate limiting and request validation,
-- and strengthen production readiness for cloud deployments.
 
 ---
 
 ## License
-
-This project is intended for educational, demo, and internal monitoring use.
-
----
-
-## Contributing
-
-Contributions are welcome. If you improve the UI, add features, fix bugs, or document workflows, feel free to open a pull request.
-| AWS_SECRET_ACCESS_KEY | AWS secret key | - |
-| SNS_TOPIC_ARN | SNS topic ARN for alerts | - |
-| ALERT_EMAIL | Email for SNS alerts | - |
-
-## 🧪 Testing
-
-### Test Log Generation
-```bash
-cd cloudwatch
-python log_generator.py 10
-```
-
-### Test CloudWatch Integration
-```bash
-python cloudwatch_sender.py application.log
-```
-
-### Test API Endpoints
-```bash
-# Health check
-curl http://localhost:5000/api/health
-
-# Login
-curl -X POST http://localhost:5000/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-```
-
-## 🔒 Security
-
-- JWT authentication for all API endpoints
-- Environment variables for sensitive data
-- IAM roles for AWS resources
-- HTTPS recommended for production
-- Regular security updates for dependencies
-
-## 📱 Mobile Support
-
-The dashboard is fully responsive and works on:
-- iOS devices (iPhone, iPad)
-- Android devices
-- Tablets
-- Desktop browsers
-
-## 🔄 Auto-Refresh
-
-The dashboard automatically refreshes every 10 seconds to show real-time data.
-
-## 📥 CSV Export
-
-Download logs as CSV files from the dashboard using the "Download CSV" button.
-
-## 🔍 Search & Filter
-
-- **Search**: Search logs by message content or log level
-- **Filter**: Filter logs by severity (INFO, WARNING, ERROR, CRITICAL)
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**DynamoDB connection error**
-- Verify AWS credentials in .env file
-- Check IAM permissions for DynamoDB
-
-**Lambda not triggering**
-- Verify CloudWatch subscription filter
-- Check Lambda execution role permissions
-
-**Frontend not connecting to backend**
-- Check CORS configuration
-- Verify backend is running on port 5000
-- Check proxy settings in package.json
-
-**SNS alerts not sending**
-- Verify SNS topic ARN
-- Check email subscription is confirmed
-- Verify IAM permissions for SNS
-
-## 📝 License
-
-MIT License
-
-## 👥 Contributing
-
-Contributions, issues, and feature requests are welcome!
-
-## 🙏 Acknowledgments
-
-- AWS for cloud services
-- Microverse for project inspiration
-- Open source community
-
-## 📞 Support
-
-For support, email support@example.com or open an issue in the repository.
+MIT License.

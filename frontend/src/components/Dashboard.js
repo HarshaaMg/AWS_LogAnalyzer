@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Activity, AlertTriangle, AlertCircle, Info, LogOut, Moon, Sun, Download, RefreshCw, Search, Upload, X } from 'lucide-react';
+import { Activity, AlertTriangle, AlertCircle, LogOut, Moon, Sun, Download, RefreshCw, Search, Upload, X, Server } from 'lucide-react';
 import { Pie, Line } from 'react-chartjs-2';
+import LinuxObservability from './LinuxObservability';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -26,6 +27,7 @@ ChartJS.register(
 );
 
 function Dashboard({ onLogout, isDarkMode, toggleDarkMode }) {
+  const [activeTab, setActiveTab] = useState('observability'); // 'observability' | 'logs'
   const [stats, setStats] = useState(null);
   const [logs, setLogs] = useState([]);
   const [alerts, setAlerts] = useState([]);
@@ -41,6 +43,7 @@ function Dashboard({ onLogout, isDarkMode, toggleDarkMode }) {
     fetchData();
     const interval = setInterval(fetchData, 10000); // Auto-refresh every 10 seconds
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterSeverity]);
 
   const fetchData = async () => {
@@ -183,10 +186,40 @@ function Dashboard({ onLogout, isDarkMode, toggleDarkMode }) {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Activity className="w-8 h-8 text-primary" />
-            <h1 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-              AWS Cloud Log Analyzer
-            </h1>
+            <div>
+              <h1 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                Linux Observability & Scaling Platform
+              </h1>
+              <p className="text-[10px] text-gray-400">AWS Cloud Log Analyzer</p>
+            </div>
           </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center bg-gray-100 dark:bg-gray-700/60 p-1 rounded-xl gap-1">
+            <button
+              onClick={() => setActiveTab('observability')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'observability'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>Observability & Auto-Scaling</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                activeTab === 'logs'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Log Analytics & Alerts</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-4">
             <button
               onClick={toggleDarkMode}
@@ -206,7 +239,11 @@ function Dashboard({ onLogout, isDarkMode, toggleDarkMode }) {
       </header>
 
       <main className="max-w-7xl mx-auto p-4">
-        {/* Stats Cards */}
+        {activeTab === 'observability' ? (
+          <LinuxObservability isDarkMode={isDarkMode} />
+        ) : (
+          <>
+            {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
             icon={<Activity className="w-6 h-6" />}
@@ -381,6 +418,8 @@ function Dashboard({ onLogout, isDarkMode, toggleDarkMode }) {
               ))}
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
 

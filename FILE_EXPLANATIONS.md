@@ -1,995 +1,640 @@
-# File Explanations Guide
+# Comprehensive File Explanations Guide
 
-This document explains the purpose, responsibilities, and usage of the key files in the AWS Cloud Log Analyzer project. It is written to help developers quickly understand how the repository is organized and how each component contributes to the full application.
+## Real-Time Linux Observability, Log Analytics & Auto-Scaling Platform
+
+This document is the definitive architectural and engineering reference for every file across the entire repository. It details each file's **purpose**, **architectural motivation (why it was created)**, **functional mechanics (what it does)**, **key classes/functions**, and **subsystem dependencies**.
 
 ---
 
 ## Table of Contents
 
-1. [Project Structure Overview](#project-structure-overview)
-2. [Root-Level Files](#root-level-files)
-3. [Backend Files](#backend-files)
-4. [Frontend Files](#frontend-files)
-5. [CloudWatch and AWS Helpers](#cloudwatch-and-aws-helpers)
-6. [Deployment and Infrastructure Files](#deployment-and-infrastructure-files)
-7. [Documentation Files](#documentation-files)
+1. [Architectural Overview & Repository Layout](#1-architectural-overview--repository-layout)
+2. [Root-Level Configuration & Utility Scripts](#2-root-level-configuration--utility-scripts)
+3. [Backend Core & Initialization](#3-backend-core--initialization)
+4. [Backend Data Models (backend/models/)](#4-backend-data-models-backendmodels)
+5. [Backend Storage Subsystem & Factory](#5-backend-storage-subsystem--factory)
+6. [Backend API Blueprints & Routing (backend/routes/)](#6-backend-api-blueprints--routing-backendroutes)
+7. [Backend Autonomous Scaling & Decision Engine (backend/scaling/)](#7-backend-autonomous-scaling--decision-engine-backendscaling)
+8. [Backend Hybrid VM Provisioners (backend/provisioners/)](#8-backend-hybrid-vm-provisioners-backendprovisioners)
+9. [Backend Streaming Bus & Sliding Window Analytics (backend/streaming/)](#9-backend-streaming-bus--sliding-window-analytics-backendstreaming)
+10. [Backend Linux Agents & Telemetry Collectors (backend/agents/)](#10-backend-linux-agents--telemetry-collectors-backendagents)
+11. [Backend Local Storage Schemas & Persistence (backend/local_storage/)](#11-backend-local-storage-schemas--persistence-backendlocal_storage)
+12. [Backend Integration Test Suite](#12-backend-integration-test-suite)
+13. [Frontend Application Architecture (frontend/)](#13-frontend-application-architecture-frontend)
+14. [CloudWatch & Serverless Processing (cloudwatch/ & lambda/)](#14-cloudwatch--serverless-processing-cloudwatch--lambda)
+15. [Infrastructure as Code & Deployment Automation (terraform/ & deploy/)](#15-infrastructure-as-code--deployment-automation-terraform--deploy)
+16. [Documentation Catalog](#16-documentation-catalog)
 
 ---
 
-## Project Structure Overview
+## 1. Architectural Overview & Repository Layout
 
-The repository is divided into four main areas:
+The platform integrates high-resolution telemetry, stream analytics, autonomous auto-scaling, and dual-layer provisioning with legacy log ingestion. The codebase is organized into discrete, highly cohesive modules:
 
-- Frontend: React-based web UI
-- Backend: Flask REST API and application logic
-- Cloud and automation: AWS scripts, Lambda, Terraform, deployment helpers
-- Documentation: setup, architecture, and project guidance
-
-This structure keeps the app modular and makes it easier to test, deploy, or extend.
-
----
-
-## Root-Level Files
-
-### docker-compose.yml
-Purpose: Defines the Docker services for the frontend and backend.
-
-Why it exists:
-- To run the full application with one command.
-- To simplify local and container-based deployment.
-
-What it does:
-- Builds and runs the backend Flask service.
-- Builds and runs the React frontend served by Nginx.
-- Connects both services on a shared Docker network.
-- Maps host ports to service ports.
-
-### generate_logs.py
-Purpose: Creates sample log files for testing and demonstration.
-
-Why it exists:
-- To let developers populate the dashboard quickly without needing real application logs.
-
-What it does:
-- Generates logs with different severity levels.
-- Writes sample logs into the backend log directory.
-- Helps validate parsing, statistics, and monitoring UI behavior.
-
-### populate_dynamodb.py
-Purpose: Populates DynamoDB with sample data when AWS storage mode is used.
-
-Why it exists:
-- To seed the cloud storage layer with test records.
-
-What it does:
-- Inserts example log records and alerts into DynamoDB.
-- Useful for validating AWS integration without manually adding data.
-
-### .env
-Purpose: Stores environment-specific configuration values.
-
-Why it exists:
-- To keep secrets and local settings separate from source code.
-
-What it does:
-- Stores values such as JWT secrets, AWS region, and notification config.
-- The backend loads these values at runtime.
-
-### .env.example
-Purpose: A template showing which environment variables are expected.
-
-Why it exists:
-- To guide developers in creating their own local environment file.
-
-What it does:
-- Lists variables needed for authentication, storage mode, and AWS integration.
-
----
-
-## Backend Files
-
-### backend/app.py
-Purpose: Main entry point for the Flask backend.
-
-Why it exists:
-- This is the core application file that exposes the REST API and orchestrates app behavior.
-
-What it does:
-- Initializes the Flask application.
-- Configures JWT authentication.
-- Defines endpoints for login, logs, alerts, stats, upload, and health.
-- Selects local or AWS storage behavior based on configuration.
-- Coordinates the notification and storage services.
-
-Key routes include:
-- POST /api/login
-- GET /api/logs
-- POST /api/logs
-- POST /api/upload
-- GET /api/alerts
-- GET /api/stats
-- POST /api/stats/refresh
-- GET /api/health
-
-### backend/local_log_reader.py
-Purpose: Parses and reads log files from the local filesystem.
-
-Why it exists:
-- To support the local storage mode using plain files instead of cloud services.
-
-What it does:
-- Reads logs from the backend log folder.
-- Parses common log patterns.
-- Converts raw lines into structured log entries.
-- Supports severity-based filtering.
-
-### backend/dummy_log_generator.py
-Purpose: Generates synthetic log entries for testing and demo purposes.
-
-Why it exists:
-- To simulate realistic app activity without depending on external systems.
-
-What it does:
-- Produces logs at different severity levels.
-- Creates representative messages for errors, warnings, and critical events.
-- Can be used in local or demo environments.
-
-### backend/notification_service.py
-Purpose: Handles alert notifications.
-
-Why it exists:
-- To notify operators when critical events occur.
-
-What it does:
-- Stores alerts locally in JSON form.
-- Optionally sends email or SMS notifications.
-- Works for both local and cloud-based alerting scenarios.
-
-### backend/aws_storage_adapter.py
-Purpose: Provides an abstraction layer for AWS storage operations.
-
-Why it exists:
-- To separate cloud-specific logic from the main app flow.
-
-What it does:
-- Reads and writes logs to DynamoDB.
-- Stores alerts and stats in DynamoDB.
-- Publishes SNS alerts for critical events.
-- Enables the application to work in cloud mode.
-
-### backend/requirements.txt
-Purpose: Lists the Python dependencies required by the backend.
-
-Why it exists:
-- To simplify setup and make the environment reproducible.
-
-What it does:
-- Declares Flask, JWT, boto3, dotenv, and gunicorn dependencies.
-
-### backend/Dockerfile
-Purpose: Builds the backend container image.
-
-Why it exists:
-- To package the backend for Docker-based deployment.
-
-What it does:
-- Installs dependencies.
-- Copies the app into the image.
-- Exposes port 5000.
-- Starts the Flask app using Gunicorn.
-
-### backend/local_storage/
-Purpose: Stores local JSON files used when running in local mode.
-
-Why it exists:
-- To keep alert and stats data persistent without needing AWS resources.
-
-What it contains:
-- alerts.json
-- stats.json
-
-### backend/logs/
-Purpose: Stores local log files.
-
-Why it exists:
-- To allow the local log reader to parse and analyze files.
-
-What it contains:
-- uploaded or generated log files such as .log and .txt files.
-
----
-
-## Frontend Files
-
-### frontend/src/App.js
-Purpose: Main React application shell and route handling.
-
-Why it exists:
-- To manage application-level state such as authentication and dark mode.
-
-What it does:
-- Defines the login and dashboard routes.
-- Redirects users based on authentication status.
-- Stores the auth token in browser storage.
-
-### frontend/src/components/Login.js
-Purpose: Renders the login page.
-
-Why it exists:
-- To provide a user-friendly authentication interface.
-
-What it does:
-- Collects username and password.
-- Sends login requests to the backend.
-- Shows error feedback for invalid credentials.
-
-### frontend/src/components/Dashboard.js
-Purpose: Main monitoring dashboard UI.
-
-Why it exists:
-- To let users view logs, alerts, stats, and system health.
-
-What it does:
-- Fetches logs, alerts, and stats from the API.
-- Displays summary cards and charts.
-- Supports search, severity filters, CSV export, and upload actions.
-- Refreshes data periodically.
-
-### frontend/package.json
-Purpose: Declares frontend dependencies and scripts.
-
-Why it exists:
-- To manage the React app build and runtime scripts.
-
-What it does:
-- Defines scripts for start, build, and test.
-- Declares libraries such as React, Axios, Chart.js, and Tailwind.
-
-### frontend/Dockerfile
-Purpose: Builds the frontend container image.
-
-Why it exists:
-- To package the UI for container deployment.
-
-What it does:
-- Installs the app dependencies.
-- Builds the React app.
-- Serves the static build using Nginx.
-
-### frontend/nginx.conf
-Purpose: Configures Nginx for serving the frontend.
-
-Why it exists:
-- To route the app correctly and support static hosting.
-
-What it does:
-- Serves the built frontend assets.
-- Handles client-side routing.
-
----
-
-## CloudWatch and AWS Helpers
-
-### cloudwatch/log_generator.py
-Purpose: Generates log data suitable for CloudWatch integration.
-
-Why it exists:
-- To provide realistic sample logs for testing event flow.
-
-What it does:
-- Generates log messages for multiple severity levels.
-- Supports streaming and batch-style generation.
-
-### cloudwatch/cloudwatch_sender.py
-Purpose: Sends logs to AWS CloudWatch Logs.
-
-Why it exists:
-- To connect the application to AWS observability tooling.
-
-What it does:
-- Reads local log files.
-- Publishes them to CloudWatch Log Groups and Streams.
-
-### cloudwatch/setup_aws_resources.py
-Purpose: Automates AWS resource creation for the project.
-
-Why it exists:
-- To make cloud setup easier and more repeatable.
-
-What it does:
-- Creates required AWS resources such as log groups, IAM access points, or supporting infrastructure.
-
-### lambda/log_processor.py
-Purpose: Lambda function for processing logs.
-
-Why it exists:
-- To support serverless processing of incoming log data.
-
-What it does:
-- Processes events and can route them into downstream storage or alerting systems.
-
----
-
-## Deployment and Infrastructure Files
-
-### terraform/main.tf
-Purpose: Terraform definition for AWS infrastructure.
-
-Why it exists:
-- To provision infrastructure in a declarative way.
-
-What it does:
-- Defines resources for hosting and supporting the app on AWS.
-
-### terraform/variables.tf
-Purpose: Declares Terraform input variables.
-
-Why it exists:
-- To make infrastructure configuration reusable and configurable.
-
-What it does:
-- Defines variables for region, names, and other deployment settings.
-
-### terraform/outputs.tf
-Purpose: Exposes Terraform output values.
-
-Why it exists:
-- To surface useful information after deployment.
-
-What it does:
-- Outputs resource identifiers and endpoints.
-
-### deploy/setup_ec2.sh
-Purpose: Bootstraps an EC2 instance for deployment.
-
-Why it exists:
-- To automate environment setup on AWS EC2.
-
-### deploy/deploy_ec2.sh
-Purpose: Deploys the application to an EC2 machine.
-
-Why it exists:
-- To simplify production rollout.
-
-### deploy/lambda_deploy.sh
-Purpose: Deploys the Lambda function.
-
-Why it exists:
-- To support serverless deployment paths.
-
----
-
-## Documentation Files
-
-### README.md
-Purpose: Main project overview and onboarding guide.
-
-Why it exists:
-- To help developers and users quickly understand the project.
-
-### PROJECT_DOCUMENTATION.md
-Purpose: Detailed technical documentation.
-
-Why it exists:
-- To provide deeper architecture and implementation details.
-
-### PROJECT_DESCRIPTION_AND_EDGE_CASES.md
-Purpose: Summarizes the system and documents edge cases.
-
-Why it exists:
-- To help developers understand operational risks and expected behavior.
-
-### LOCAL_SETUP.md
-Purpose: Explains how to use the app in local-only mode.
-
-### MODE_SWITCHING.md
-Purpose: Explains how to switch between local and AWS-backed storage modes.
-
----
-
-## Summary
-
-Each file in this repository plays a role in one of three main layers:
-
-- application logic,
-- user interface,
-- or deployment and infrastructure support.
-
-Understanding this structure makes it easier to develop features, troubleshoot issues, and extend the project responsibly.
-
-
-**File Structure**:
 ```
-local_storage/
-├── alerts.json    # Array of alert objects
-└── stats.json     # Statistics object
+AWS_LogAnalyzer/
+├── docker-compose.yml                     # Multi-container orchestration (Backend + Frontend)
+├── generate_logs.py                       # CLI synthetic log generator
+├── populate_dynamodb.py                   # AWS DynamoDB seeding utility
+├── FILE_EXPLANATIONS.md                   # This comprehensive file guide
+├── PROJECT_DESCRIPTION_AND_EDGE_CASES.md  # Failure modes and edge cases reference
+├── PROJECT_DOCUMENTATION.md               # Primary technical manual and architecture guide
+├── README.md                              # Developer onboarding and quickstart guide
+│
+├── backend/                               # Flask Python backend
+│   ├── app.py                             # Main Flask application and server entrypoint
+│   ├── local_storage_manager.py           # Thread-safe atomic JSON persistence engine
+│   ├── storage_factory.py                 # Abstract storage provider factory
+│   ├── aws_storage_adapter.py             # DynamoDB and CloudWatch SDK adapter
+│   ├── notification_service.py            # Local, Email, SMS, and SNS alerting engine
+│   ├── local_log_reader.py                # Legacy raw log parser and reader
+│   ├── dummy_log_generator.py             # Synthetic log stream generator
+│   ├── test_auto_scaling.py               # End-to-end integration test suite
+│   ├── requirements.txt                   # Python package dependencies
+│   ├── Dockerfile                         # Production backend container image
+│   ├── .env.example                       # Environment configuration template
+│   │
+│   ├── models/                            # Domain entities and schemas
+│   │   └── entities.py                    # Host, Metric, ScalingEvent, Incident, ProvisioningTask
+│   │
+│   ├── routes/                            # Modular Flask REST API Blueprints
+│   │   ├── hosts_bp.py                    # Host registration, inventory, and heartbeats
+│   │   ├── metrics_bp.py                  # Telemetry ingestion, real-time query, and aggregation
+│   │   ├── scaling_bp.py                  # Auto-scaling policies, triggers, history, and status
+│   │   └── health_bp.py                   # Component health probes and diagnostics
+│   │
+│   ├── scaling/                           # Auto-scaling decision and orchestration engine
+│   │   ├── decision_engine.py             # Rule evaluation, hysteresis, cooldown, and limits
+│   │   ├── scaling_controller.py          # Asynchronous provisioning worker pool & dispatcher
+│   │   └── workload_scheduler.py          # Least-utilized healthy VM workload router
+│   │
+│   ├── provisioners/                      # Dual-layer hypervisor orchestration
+│   │   ├── base.py                        # Abstract base provisioner interface
+│   │   ├── vmware_provisioner.py          # Layer 1: VMware Workstation / vSphere REST FSM
+│   │   ├── aws_provisioner.py             # Layer 2: AWS EC2 Boto3 SDK provisioner
+│   │   └── factory.py                     # Hypervisor provisioner factory
+│   │
+│   ├── streaming/                         # High-throughput event streaming & sliding window
+│   │   ├── event_stream.py                # Kafka / Redpanda producer with in-memory ring buffer
+│   │   └── stream_processor.py            # 5-minute sliding window time-series aggregator
+│   │
+│   ├── agents/                            # Linux host metrics collection & boot-time scripts
+│   │   ├── node_exporter_collector.py     # Prometheus Node Exporter metrics scraper
+│   │   ├── fluent_bit_parser.py           # Fluent Bit structured log parser
+│   │   └── vm_template_init.sh            # cloud-init guest bootstrap shell script
+│   │
+│   └── local_storage/                     # Atomic JSON persistence directory
+│       ├── hosts.json                     # Registered Linux hosts and state
+│       ├── resource_metrics.json          # Hardware telemetry time-series records
+│       ├── scaling_events.json            # SCALE_OUT / SCALE_IN audit logs
+│       ├── incidents.json                 # Unhealthy node and failure incident records
+│       ├── provisioning.json              # Asynchronous provisioning task FSM states
+│       ├── alerts.json                    # Critical log alerts
+│       └── stats.json                     # Cluster-wide log statistics
+│
+├── frontend/                              # React 18 single-page application
+│   ├── public/index.html                  # HTML5 application shell
+│   ├── src/
+│   │   ├── index.js                       # React DOM initialization
+│   │   ├── index.css                      # Tailwind directives and CSS variables
+│   │   ├── App.js                         # Root React component, auth state & dark theme
+│   │   ├── App.css                        # Global layout overrides and animations
+│   │   └── components/
+│   │       ├── Dashboard.js               # Unified dashboard with tabbed navigation
+│   │       ├── LinuxObservability.js      # Host metrics, VM table, charts, scaling controls
+│   │       └── Login.js                   # JWT authentication UI
+│   ├── package.json                       # NPM dependencies and scripts
+│   ├── tailwind.config.js                 # Custom color themes and responsive breakpoints
+│   ├── postcss.config.js                  # PostCSS plugins (Tailwind, Autoprefixer)
+│   ├── nginx.conf                         # Production SPA web server configuration
+│   └── Dockerfile                         # Multi-stage production container build
+│
+├── cloudwatch/                            # AWS CloudWatch log shipping tools
+│   ├── cloudwatch_sender.py               # CloudWatch Logs batch & tail publisher
+│   ├── log_generator.py                   # Continuous CloudWatch-format log generator
+│   ├── setup_aws_resources.py             # Automated AWS resource setup script
+│   └── requirements.txt                   # CloudWatch script dependencies
+│
+├── lambda/                                # AWS Serverless event processing
+│   ├── log_processor.py                   # AWS Lambda log parser and DynamoDB/SNS router
+│   ├── log_processor.zip                  # Ready-to-deploy zipped Lambda artifact
+│   └── requirements.txt                   # Lambda runtime dependencies
+│
+├── terraform/                             # Declarative Infrastructure as Code
+│   ├── main.tf                            # EC2, DynamoDB, SNS, IAM, and Security Groups
+│   ├── variables.tf                       # Terraform input parameters
+│   └── outputs.tf                         # Infrastructure endpoints and resource ARNs
+│
+└── deploy/                                # Shell scripts for cloud provisioning
+    ├── deploy_ec2.sh                      # EC2 git pull and container restart script
+    ├── setup_ec2.sh                       # Initial EC2 Docker environment bootstrap
+    ├── lambda_deploy.sh                   # Linux/macOS Lambda packager and updater
+    ├── lambda_deploy.ps1                  # Windows PowerShell Lambda packager
+    ├── lambda-policy.json                 # IAM permissions policy for Lambda execution
+    ├── lambda-trust-policy.json           # IAM trust relationship policy for Lambda
+    └── nginx.conf                         # EC2 reverse proxy configuration
 ```
 
 ---
 
-## Frontend Directory
+## 2. Root-Level Configuration & Utility Scripts
 
-### src/App.js
-**Purpose**: Main React application component
+### `docker-compose.yml`
+- **Purpose**: Multi-container orchestration definition for running the complete frontend and backend environment with a single command.
+- **Why Created**: Eliminates configuration drift across development, staging, and production environments by guaranteeing consistent network routing, volume mounts, and environment variable bindings.
+- **What It Does**:
+  - Configures the `backend` service: Builds `backend/Dockerfile`, exposes port `5000:5000`, maps local storage volumes (`./backend/local_storage:/app/local_storage` and `./backend/logs:/app/logs`), and sets environment variables (`STORAGE_MODE=local`, `FLASK_ENV=production`).
+  - Configures the `frontend` service: Builds `frontend/Dockerfile`, exposes port `80:80`, and connects to the backend over the shared Docker bridge network `log-analyzer-network`.
+  - Configures container restart policies (`restart: unless-stopped`).
 
-**Why Created**: To serve as the root component that manages authentication state and routing.
+### `generate_logs.py`
+- **Purpose**: Standalone CLI script for generating synthetic application log files with realistic timestamps, components, and severity levels.
+- **Why Created**: Enables rapid functional testing of log ingestion, upload processing, and severity filtering without requiring an external running production application.
+- **What It Does**:
+  - Synthesizes formatted log lines matching the standard pattern: `[YYYY-MM-DD HH:MM:SS] [LEVEL] [COMPONENT] Message`.
+  - Randomly selects from realistic messages across `INFO`, `WARNING`, `ERROR`, and `CRITICAL` levels.
+  - Writes directly into `backend/logs/application.log` or a custom output path.
 
-**What It Does**:
-- Manages authentication state (logged in/out)
-- Handles dark/light mode state
-- Implements routing between Login and Dashboard
-- Stores JWT token in localStorage
-- Provides authentication context to child components
-- Handles logout functionality
+### `populate_dynamodb.py`
+- **Purpose**: AWS DynamoDB database seeding script.
+- **Why Created**: Allows developers and CI/CD pipelines to pre-populate AWS tables with realistic log entries, alerts, and metrics to validate the AWS-backed operational mode.
+- **What It Does**:
+  - Connects to AWS DynamoDB using Boto3.
+  - Inserts batch records into `CloudLogs`, `CloudAlerts`, and `CloudStats`.
+  - Validates partition key (`LogId`, `AlertId`) and sort key schemas, handling provisioned throughput constraints with retries.
 
-**Key Features**:
-- Token persistence across page refreshes
-- Protected routes (dashboard requires login)
-- Theme state management
-- Centralized authentication logic
-
----
-
-### src/App.css
-**Purpose**: Global CSS styles for the React application
-
-**Why Created**: To provide custom CSS styles that complement Tailwind CSS.
-
-**What It Does**:
-- Defines custom CSS variables
-- Adds global styles for components
-- Overrides default browser styles
-- Provides theme-specific styles
-- Supports dark/light mode
+### `.gitignore`
+- **Purpose**: Git version control exclusion list.
+- **Why Created**: Prevents sensitive API credentials, build artifacts, local database dumps, and virtual environments from accidentally being committed to public repositories.
+- **What It Does**:
+  - Ignores `.env`, `__pycache__/`, `*.pyc`, `venv/`, `node_modules/`, `build/`, `*.log`, and temporary local storage backups.
 
 ---
 
-### src/index.js
-**Purpose**: React application entry point
+## 3. Backend Core & Initialization
 
-**Why Created**: To initialize the React application and render it to the DOM.
+### `backend/app.py`
+- **Purpose**: Main Flask application factory, server entrypoint, and central coordinator.
+- **Why Created**: Serves as the central API gateway that binds all route blueprints, configures middleware, initializes the storage layer, and manages security policies.
+- **What It Does**:
+  - Instantiates the Flask WSGI application with CORS support (`Flask-CORS`).
+  - Configures JWT authentication (`PyJWT` / `flask-jwt-extended`) with secret key validation and expiration handling.
+  - Automatically initializes local storage directories (`backend/local_storage/` and `backend/logs/`) on startup.
+  - Registers modular REST blueprints:
+    - `/api/hosts` $\rightarrow$ `hosts_bp`
+    - `/api/metrics` $\rightarrow$ `metrics_bp`
+    - `/api/scaling` $\rightarrow$ `scaling_bp`
+    - `/api/health` $\rightarrow$ `health_bp`
+  - Maintains full backward compatibility with legacy endpoints:
+    - `POST /api/login`: Validates user credentials and issues JWT bearer tokens.
+    - `GET /api/logs`: Retrieves parsed log records with level filtering and search queries.
+    - `POST /api/logs`: Ingests a single structured log entry.
+    - `POST /api/upload`: Handles multipart log file uploads with 16MB file limit enforcement.
+    - `GET /api/alerts`: Retrieves active system alerts.
+    - `GET /api/stats` and `POST /api/stats/refresh`: Calculates and refreshes aggregate log metrics.
+- **Key Inter-Module Relations**: Imports from `backend/routes/`, `backend/local_storage_manager.py`, `backend/storage_factory.py`, and `backend/notification_service.py`.
 
-**What It Does**:
-- Imports React and ReactDOM
-- Imports the main App component
-- Imports global CSS styles
-- Renders the App component to the root DOM element
-- Enables React Strict Mode for development
+### `backend/requirements.txt`
+- **Purpose**: Python package dependency manifest.
+- **Why Created**: Ensures deterministic, reproducible Python virtual environments across bare metal, Docker containers, and CI/CD pipelines.
+- **What It Does**:
+  - Specifies required packages: `Flask`, `Flask-CORS`, `PyJWT`, `boto3`, `python-dotenv`, `gunicorn`, `requests`, and `kafka-python`.
 
----
+### `backend/Dockerfile`
+- **Purpose**: Container definition for the Python Flask backend.
+- **Why Created**: Packages the Python runtime, system dependencies, and application code into a lightweight, deployable container image.
+- **What It Does**:
+  - Uses `python:3.11-slim` base image for minimal attack surface and fast startup.
+  - Installs compilation dependencies (`gcc`, `curl`).
+  - Installs requirements via `pip install --no-cache-dir`.
+  - Exposes port `5000`.
+  - Starts the application using Gunicorn WSGI server (`gunicorn --bind 0.0.0.0:5000 app:app --workers 4 --threads 2`).
 
-### src/index.css
-**Purpose**: Global CSS styles and Tailwind imports
-
-**Why Created**: To import Tailwind CSS and provide global styling rules.
-
-**What It Does**:
-- Imports Tailwind CSS directives
-- Provides base styles
-- Includes custom utility classes
-- Sets up CSS variables for theming
-- Defines global resets
-
----
-
-### src/components/Login.js
-**Purpose**: Login page component
-
-**Why Created**: To provide a user interface for authentication.
-
-**What It Does**:
-- Renders login form with username and password fields
-- Handles form submission
-- Calls login API endpoint
-- Stores JWT token on successful login
-- Redirects to dashboard on success
-- Displays error messages for failed login
-- Supports dark/light mode
-
-**Default Credentials**:
-- Username: `admin`
-- Password: `admin123`
-
----
-
-### src/components/Dashboard.js
-**Purpose**: Main dashboard component for log analysis
-
-**Why Created**: To provide a comprehensive interface for viewing logs, statistics, and alerts.
-
-**What It Does**:
-- Displays summary statistics cards
-- Renders interactive charts (Pie, Line)
-- Shows recent logs in a table
-- Displays critical alerts
-- Provides search and filter functionality
-- Implements file upload modal
-- Handles CSV export
-- Auto-refreshes data every 10 seconds
-- Supports dark/light mode
-- Mobile-responsive design
-
-**Key Features**:
-- Real-time statistics display
-- Log distribution pie chart
-- Error trends line chart
-- Search logs by message or level
-- Filter by severity
-- Upload log files
-- Download logs as CSV
-- View critical alerts
-
-**State Management**:
-```javascript
-const [stats, setStats] = useState(null);
-const [logs, setLogs] = useState([]);
-const [alerts, setAlerts] = useState([]);
-const [showUploadModal, setShowUploadModal] = useState(false);
-const [uploadFile, setUploadFile] = useState(null);
-```
+### `backend/.env.example`
+- **Purpose**: Environment configuration template.
+- **Why Created**: Documents all required and optional environment variables for new developers and automated deployment scripts.
+- **What It Does**:
+  - Defines `FLASK_ENV`, `PORT`, `JWT_SECRET_KEY`, `STORAGE_MODE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SNS_TOPIC_ARN`, `KAFKA_BOOTSTRAP_SERVERS`, `HYPERVISOR_TYPE`, and `AUTOSCALING_DRY_RUN`.
 
 ---
 
-### public/index.html
-**Purpose**: HTML template for the React application
+## 4. Backend Data Models (`backend/models/`)
 
-**Why Created**: To provide the base HTML structure that React renders into.
-
-**What It Does**:
-- Defines the HTML5 document structure
-- Includes meta tags for viewport and encoding
-- Sets the page title
-- Provides the root div for React rendering
-- Includes Font Awesome for icons (if used)
-
----
-
-### package.json
-**Purpose**: Node.js dependencies and scripts configuration
-
-**Why Created**: To define the project's dependencies, scripts, and metadata for npm.
-
-**What It Does**:
-- Lists all npm dependencies
-- Specifies package versions
-- Defines npm scripts (start, build, test)
-- Configures ESLint rules
-- Sets browser compatibility targets
-- Configures proxy for API calls
-
-**Key Dependencies**:
-- `react@18.2.0`: UI library
-- `react-dom@18.2.0`: React DOM renderer
-- `axios@1.6.0`: HTTP client
-- `chart.js@4.4.0`: Charting library
-- `react-chartjs-2@5.2.0`: React Chart.js wrapper
-- `lucide-react@0.294.0`: Icon library
-
-**Scripts**:
-- `npm start`: Start development server
-- `npm build`: Build for production
-- `npm test`: Run tests
-
-**Proxy**: Configured to proxy API calls to `http://localhost:5000`
+### `backend/models/entities.py`
+- **Purpose**: Strongly typed domain models and entity definitions for the observability and scaling ecosystem.
+- **Why Created**: Eliminates ad-hoc dictionaries across the backend, establishing strict data contracts, validation rules, and JSON serialization methods for all platform entities.
+- **Key Classes**:
+  - `Host`: Represents a monitored Linux virtual machine or bare-metal host. Fields: `host_id`, `hostname`, `ip_address`, `cpu_cores`, `memory_gb`, `os_info`, `hypervisor`, `state` (`PENDING`, `RUNNING`, `DRAINING`, `STOPPED`, `TERMINATED`), `is_healthy`, `last_heartbeat`, `tags`. Includes `.to_dict()` and `.from_dict()` methods.
+  - `Metric`: Represents a discrete time-series hardware sample. Fields: `metric_id`, `host_id`, `timestamp`, `cpu_percent`, `memory_percent`, `disk_percent`, `network_rx_kbps`, `network_tx_kbps`, `load_1m`, `process_count`, `error_rate`.
+  - `ScalingEvent`: Represents an audit log of an auto-scaling evaluation or execution. Fields: `event_id`, `timestamp`, `action` (`SCALE_OUT`, `SCALE_IN`, `NO_ACTION`), `trigger_reason`, `target_host_id`, `metrics_snapshot`, `status` (`SUCCESS`, `FAILED`, `SIMULATED`), `cooldown_remaining`.
+  - `Incident`: Represents an anomaly, threshold breach, or host outage. Fields: `incident_id`, `timestamp`, `host_id`, `severity` (`CRITICAL`, `WARNING`), `title`, `description`, `acknowledged`.
+  - `ProvisioningTask`: Represents an asynchronous VM provisioning or de-provisioning lifecycle task. Fields: `task_id`, `host_id`, `action`, `state` (`REQUESTED`, `CREATING`, `CLONING`, `CONFIGURING_IP`, `RUNNING`, `FAILED`), `progress_pct`, `created_at`, `updated_at`, `error_message`.
+- **Key Inter-Module Relations**: Imported by all routes, provisioners, decision engines, and storage managers.
 
 ---
 
-### Dockerfile
-**Purpose**: Docker image definition for the frontend
+## 5. Backend Storage Subsystem & Factory
 
-**Why Created**: To containerize the frontend React application for consistent deployment.
+### `backend/local_storage_manager.py`
+- **Purpose**: High-reliability, thread-safe, atomic JSON persistence manager.
+- **Why Created**: Guarantees zero data loss or corruption during concurrent writes without requiring an external SQL database in local development or edge environments.
+- **What It Does**:
+  - Uses `threading.Lock` to synchronize read/write access across multiple worker threads.
+  - Implements atomic file writes: serializes data, writes to a temporary file (`<filename>.tmp`), flushes and syncs to disk (`os.fsync`), and performs an atomic rename (`os.replace`).
+  - Implements automatic corruption recovery: if `json.load()` fails due to an incomplete write or power outage, it renames the corrupted file to `<filename>.corrupt.<timestamp>` and re-initializes a valid empty structure.
+  - Provides CRUD methods for hosts, metrics, scaling events, incidents, provisioning tasks, and legacy alerts.
 
-**What It Does**:
-- Uses multi-stage build for optimization
-- Stage 1: Build React application
-- Stage 2: Serve with Nginx
-- Copies built files to Nginx
-- Configures Nginx as web server
-- Exposes port 80
-- Optimizes image size
+### `backend/storage_factory.py`
+- **Purpose**: Factory pattern implementation for abstracting storage providers.
+- **Why Created**: Enables seamless switching between local file-based storage and AWS cloud storage via a single environment variable (`STORAGE_MODE=local` vs. `STORAGE_MODE=aws`).
+- **What It Does**:
+  - Inspects `STORAGE_MODE`.
+  - Returns either an instance of `LocalStorageManager` or `AWSStorageAdapter`.
+  - Ensures callers interact with a uniform API interface regardless of underlying persistence technology.
 
-**Build Process**:
-1. Install Node.js dependencies
-2. Build React application
-3. Copy to Nginx image
-4. Configure Nginx to serve static files
+### `backend/aws_storage_adapter.py`
+- **Purpose**: AWS cloud persistence adapter utilizing DynamoDB, CloudWatch, and SNS.
+- **Why Created**: Enables enterprise cloud deployments where metrics, logs, and alerts must be stored in managed, auto-scaling AWS data stores.
+- **What It Does**:
+  - Connects to DynamoDB using Boto3 resource interfaces.
+  - Manages operations on `CloudLogs`, `CloudAlerts`, `CloudStats`, `Hosts`, and `ResourceMetrics` tables.
+  - Publishes critical security and capacity alerts to AWS SNS topics.
+  - Implements automatic retries with exponential backoff for DynamoDB throttling.
 
----
+### `backend/notification_service.py`
+- **Purpose**: Centralized alerting and notification dispatcher.
+- **Why Created**: Decouples alert generation logic from delivery channels, supporting local in-app alerts, email (SMTP), SMS (Twilio), and AWS SNS.
+- **What It Does**:
+  - Evaluates alert severity.
+  - In local mode, appends alert records to `backend/local_storage/alerts.json`.
+  - In AWS mode, dispatches JSON payloads to configured SNS Topic ARNs.
+  - Handles network timeouts and missing credential edge cases gracefully without blocking main application flows.
 
-### nginx.conf
-**Purpose**: Nginx configuration for serving the frontend
+### `backend/local_log_reader.py`
+- **Purpose**: High-performance local log file parser and aggregator.
+- **Why Created**: Provides core parsing capabilities for reading and querying raw `.log` and `.txt` files stored in `backend/logs/`.
+- **What It Does**:
+  - Reads raw log files line-by-line using streaming iterators to prevent high memory usage.
+  - Parses timestamps and severity levels (`CRITICAL`, `ERROR`, `WARNING`, `INFO`) using compiled regular expressions.
+  - Provides in-memory search, keyword filtering, and pagination.
 
-**Why Created**: To configure Nginx as a production web server for the React application.
-
-**What It Does**:
-- Configures Nginx to listen on port 80
-- Serves static files from /usr/share/nginx/html
-- Enables gzip compression
-- Sets up caching headers
-- Handles SPA routing (fallback to index.html)
-- Optimizes performance
-
-**Key Directives**:
-- `root /usr/share/nginx/html`: Static files location
-- `try_files $uri /index.html`: SPA routing
-- `gzip on`: Enable compression
-- `expires`: Cache control
-
----
-
-### tailwind.config.js
-**Purpose**: Tailwind CSS configuration
-
-**Why Created**: To customize Tailwind CSS for the project's design system.
-
-**What It Does**:
-- Configures Tailwind content paths
-- Defines custom color palette
-- Sets up dark mode strategy
-- Extends default theme
-- Configures breakpoints
-- Adds custom utilities
-
-**Custom Colors**:
-- `primary`: Blue theme color
-- `danger`: Red for errors
-- `warning`: Yellow for warnings
-- `success`: Green for success
-- `dark`: Dark mode background
-- `darker`: Darker background
+### `backend/dummy_log_generator.py`
+- **Purpose**: Background synthetic log generator service.
+- **Why Created**: Generates dynamic log entries in development environments to populate charts and alert feeds.
+- **What It Does**:
+  - Runs in a background daemon thread.
+  - Emits representative logs for simulated application components (AuthService, DatabasePool, PaymentGateway, APIRouter) at configurable intervals.
 
 ---
 
-### postcss.config.js
-**Purpose**: PostCSS configuration for Tailwind CSS
+## 6. Backend API Blueprints & Routing (`backend/routes/`)
 
-**Why Created**: To configure PostCSS plugins, specifically Tailwind CSS.
+### `backend/routes/hosts_bp.py`
+- **Purpose**: REST API Blueprint for Linux host inventory management and health heartbeats.
+- **Why Created**: Provides dedicated endpoints for host registration, heartbeat watchdogs, and inventory status reporting.
+- **Key Endpoints**:
+  - `GET /api/hosts`: Lists all registered hosts with optional state and health filtering.
+  - `POST /api/hosts/register`: Registers a new host or updates an existing host idempotently.
+  - `POST /api/hosts/<host_id>/heartbeat`: Updates the `last_heartbeat` timestamp. Evaluates silence: flags `DEGRADED` if silent > 90s, `OFFLINE` if silent > 180s.
+  - `GET /api/hosts/<host_id>`: Returns detailed metadata for a single host.
+  - `DELETE /api/hosts/<host_id>`: Deregisters a host from the active inventory.
 
-**What It Does**:
-- Configures Tailwind CSS plugin
-- Configures Autoprefixer
-- Enables CSS processing
-- Ensures browser compatibility
+### `backend/routes/metrics_bp.py`
+- **Purpose**: REST API Blueprint for hardware metric telemetry ingestion and querying.
+- **Why Created**: Handles high-throughput metric ingestion from agent daemons and serves time-series data to frontend visual charts.
+- **Key Endpoints**:
+  - `POST /api/metrics/ingest`: Accepts real-time hardware telemetry payloads, forwards to the `EventStream`, and stores in persistence.
+  - `GET /api/metrics/latest`: Returns the most recent hardware metrics for all active hosts.
+  - `GET /api/metrics/history/<host_id>`: Returns time-series metric history for a host over a requested time range (e.g. 1h, 6h, 24h).
+  - `GET /api/metrics/cluster-summary`: Returns cluster-wide average CPU, memory, disk, network, and active VM counts.
 
----
+### `backend/routes/scaling_bp.py`
+- **Purpose**: REST API Blueprint for auto-scaling policies, manual provisioning triggers, and audit history.
+- **Why Created**: Exposes control plane operations for inspecting auto-scaling configurations, viewing scaling decisions, and executing manual scale-out/scale-in overrides.
+- **Key Endpoints**:
+  - `GET /api/scaling/policy`: Returns current auto-scaling thresholds, cooldown settings, and capacity boundaries.
+  - `POST /api/scaling/policy`: Dynamically updates scaling policy parameters at runtime.
+  - `POST /api/scaling/evaluate`: Manually triggers a cluster evaluation by the `DecisionEngine`.
+  - `POST /api/scaling/scale-out`: Manually commands the launch of a new VM instance.
+  - `POST /api/scaling/scale-in`: Manually commands the graceful termination of an underutilized VM.
+  - `GET /api/scaling/events`: Returns the historical log of scaling actions and simulation audits.
+  - `GET /api/scaling/tasks/<task_id>`: Polls the FSM progress of an asynchronous provisioning task.
 
-## CloudWatch Directory
-
-### log_generator.py
-**Purpose**: Generate logs for CloudWatch testing
-
-**Why Created**: To generate sample logs specifically for testing CloudWatch integration.
-
-**What It Does**:
-- Generates log entries in CloudWatch format
-- Creates logs with various severity levels
-- Supports streaming mode for continuous generation
-- Outputs logs to stdout or file
-- Used for testing CloudWatch log ingestion
-
-**Usage**:
-```bash
-python log_generator.py 100  # Generate 100 logs
-python log_generator.py --stream 5  # Stream every 5 seconds
-```
-
----
-
-### cloudwatch_sender.py
-**Purpose**: Send logs to AWS CloudWatch
-
-**Why Created**: To provide a tool for sending local log files to CloudWatch Logs.
-
-**What It Does**:
-- Reads local log files
-- Creates CloudWatch log groups
-- Creates log streams
-- Sends log events to CloudWatch
-- Supports tail mode for continuous monitoring
-- Handles AWS authentication
-
-**Usage**:
-```bash
-python cloudwatch_sender.py application.log
-python cloudwatch_sender.py --tail 10  # Monitor and send every 10s
-```
+### `backend/routes/health_bp.py`
+- **Purpose**: REST API Blueprint for system health probes and component diagnostics.
+- **Why Created**: Enables Docker, Kubernetes, and load balancers to perform liveness and readiness health checks.
+- **Key Endpoints**:
+  - `GET /api/health`: Returns overall system health (`UP` / `DEGRADED`), uptime, storage mode, and component status (Storage, Event Bus, Decision Engine, Provisioner).
 
 ---
 
-### setup_aws_resources.py
-**Purpose**: Set up AWS resources for the application
+## 7. Backend Autonomous Scaling & Decision Engine (`backend/scaling/`)
 
-**Why Created**: To automate the creation of required AWS resources (DynamoDB tables, SNS topics).
+### `backend/scaling/decision_engine.py`
+- **Purpose**: Core mathematical and rule-based decision engine for autonomous auto-scaling.
+- **Why Created**: Translates raw hardware metrics into intelligent, stable scaling decisions while preventing destructive failure modes such as flapping and premature spike reactions.
+- **What It Does**:
+  - Aggregates sustained metrics from the `SlidingWindowProcessor`.
+  - Evaluates cluster-wide thresholds:
+    - **Scale-Out Trigger**: Cluster average CPU > 80% OR Memory > 85%.
+    - **Scale-In Trigger**: Cluster average CPU < 25% AND Memory < 30%.
+  - Enforces operational constraints:
+    - **Cooldown Lock**: Rejects scaling actions if fewer than 300 seconds have elapsed since the prior event.
+    - **Capacity Boundaries**: Strictly limits cluster size between `min_vms` (default: 2) and `max_vms` (default: 8).
+    - **Dry-Run Mode**: Evaluates rules, logs decisions, and audits simulation records without invoking hypervisor provisioning.
+- **Key Methods**: `evaluate_cluster()`, `should_scale_out()`, `should_scale_in()`, `select_scale_in_candidate()`.
 
-**What It Does**:
-- Creates DynamoDB tables:
-  - CloudLogs (with SeverityIndex)
-  - CloudAlerts
-  - CloudStats
-- Creates SNS topic for alerts
-- Sets up IAM policies
-- Configures CloudWatch log groups
-- Outputs resource ARNs
+### `backend/scaling/scaling_controller.py`
+- **Purpose**: Asynchronous task executor and provisioning orchestrator.
+- **Why Created**: Prevents synchronous HTTP requests from blocking during long-running VM operations (cloning, booting, IP assignment).
+- **What It Does**:
+  - Manages a background `concurrent.futures.ThreadPoolExecutor`.
+  - Spawns asynchronous worker threads for `provision_instance()` and `deprovision_instance()`.
+  - Tracks task lifecycle within `ProvisioningTask` records, updating progress percentage and FSM states in storage.
+  - Invokes the appropriate provisioner via `ProvisionerFactory`.
 
-**Usage**:
-```bash
-python setup_aws_resources.py
-```
-
-**Resources Created**:
-- DynamoDB tables with proper indexes
-- SNS topic for notifications
-- IAM roles and policies
-- CloudWatch log groups
-
----
-
-### requirements.txt
-**Purpose**: Python dependencies for CloudWatch tools
-
-**Why Created**: To list dependencies for CloudWatch-specific scripts.
-
-**What It Does**:
-- Specifies boto3 for AWS SDK
-- Allows easy installation with pip
-- Ensures version compatibility
+### `backend/scaling/workload_scheduler.py`
+- **Purpose**: Intelligent compute workload dispatcher and load balancer.
+- **Why Created**: Routes incoming background tasks and batch jobs to the optimal Linux host based on real-time resource availability.
+- **What It Does**:
+  - Queries active, healthy hosts (`state == 'RUNNING'` and `is_healthy == True`).
+  - Computes composite utilization score for each candidate node:
+    $$\text{Score} = (\text{CPU}\% \times 0.5) + (\text{Memory}\% \times 0.3) + (\text{Disk}\% \times 0.2)$$
+  - Selects and returns the least-utilized host.
+  - Handles edge cases where zero healthy hosts are available by triggering an emergency scale-out event.
 
 ---
 
-## Lambda Directory
+## 8. Backend Hybrid VM Provisioners (`backend/provisioners/`)
 
-### log_processor.py
-**Purpose**: AWS Lambda function for log processing
+### `backend/provisioners/base.py`
+- **Purpose**: Abstract Base Class defining the interface contract for all hypervisor provisioners.
+- **Why Created**: Enforces a strict interface so the scaling controller can operate uniformly across VMware, AWS, or future hypervisor backends (GCP, Azure, Proxmox).
+- **Abstract Methods**:
+  - `provision_instance(hostname, cpu, ram_mb, tags) -> Host`: Boots a new VM instance.
+  - `deprovision_instance(host_id) -> bool`: Gracefully stops and destroys a VM instance.
+  - `get_instance_status(host_id) -> str`: Queries hypervisor for instance state.
 
-**Why Created**: To provide serverless log processing capability in AWS.
+### `backend/provisioners/vmware_provisioner.py`
+- **Purpose**: Layer 1 provisioner orchestrating VMware Workstation / vSphere via `vmrun` and REST APIs.
+- **Why Created**: Enables rapid, low-cost local development and private datacenter infrastructure management.
+- **What It Does**:
+  - Implements a complete Finite State Machine: `REQUESTED` $\rightarrow$ `CREATING` $\rightarrow$ `CLONING` $\rightarrow$ `CONFIGURING_IP` $\rightarrow$ `RUNNING`.
+  - Performs linked clones from golden base templates (`ubuntu-22.04-template.vmx`) using `vmrun clone`.
+  - Automates VM power operations (`start`, `stop`, `reset`).
+  - Queries VMware Guest Tools for dynamic DHCP IP assignment.
+  - Implements rollback and cleanup routines on failure.
 
-**What It Does**:
-- Triggered by CloudWatch Logs
-- Processes incoming log events
-- Analyzes log severity
-- Stores in DynamoDB
-- Triggers SNS alerts for critical logs
-- Handles Lambda execution context
+### `backend/provisioners/aws_provisioner.py`
+- **Purpose**: Layer 2 provisioner orchestrating AWS EC2 cloud instances via Boto3.
+- **Why Created**: Enables automated cloud elasticity and multi-region scale-out when local capacity is saturated.
+- **What It Does**:
+  - Connects to AWS EC2 via Boto3 client and resource interfaces.
+  - Launches EC2 instances using configured Launch Templates or explicit AMI parameters.
+  - Injects `cloud-init` user data scripts (`vm_template_init.sh`) for automated daemon installation.
+  - Attaches standard resource tags: `Project=LinuxObservabilityAutoScaling`, `ManagedBy=DecisionEngine`.
+  - Polls instance status until `running` and public/private IP addresses are confirmed.
 
-**Lambda Triggers**:
-- CloudWatch Logs subscription filters
-- SNS notifications
-- Scheduled events
-
-**Processing Logic**:
-1. Receive log events from CloudWatch
-2. Parse log entries
-3. Determine severity
-4. Store in DynamoDB
-5. Send alerts if critical
-
----
-
-### requirements.txt
-**Purpose**: Python dependencies for Lambda function
-
-**Why Created**: To specify dependencies for Lambda deployment.
-
-**What It Does**:
-- Lists boto3 for AWS SDK
-- Used by AWS Lambda deployment
-- Ensures correct package versions
+### `backend/provisioners/factory.py`
+- **Purpose**: Factory for instantiating hypervisor provisioners.
+- **Why Created**: Decouples configuration inspection from provisioner consumer logic.
+- **What It Does**:
+  - Inspects `HYPERVISOR_TYPE` environment variable (`vmware` vs. `aws`).
+  - Instantiates and returns the configured singleton provisioner.
 
 ---
 
-## Terraform Directory
+## 9. Backend Streaming Bus & Sliding Window Analytics (`backend/streaming/`)
 
-### main.tf
-**Purpose**: Main Terraform configuration for AWS infrastructure
+### `backend/streaming/event_stream.py`
+- **Purpose**: High-throughput real-time event streaming bus.
+- **Why Created**: Decouples metric producers (Node Exporter, Fluent Bit) from consumers (Sliding Window Processor, Storage, Alerting) to prevent ingestion backpressure.
+- **What It Does**:
+  - Connects to an external Apache Kafka or Redpanda broker cluster on topic `host-metrics-raw`.
+  - Implements a thread-safe in-memory ring buffer (capacity: 10,000 items) that automatically activates if Kafka is unavailable or disconnected.
+  - Provides pub/sub interfaces: `publish_metric()`, `publish_event()`, `consume()`.
 
-**Why Created**: To define AWS infrastructure as code for reproducible deployments.
-
-**What It Does**:
-- Defines AWS resources:
-  - EC2 instances
-  - DynamoDB tables
-  - CloudWatch log groups
-  - SNS topics
-  - Lambda functions
-  - IAM roles
-  - Security groups
-- Configures resource dependencies
-- Sets up networking
-- Manages resource lifecycle
-
-**Resources Defined**:
-- `aws_instance`: EC2 server
-- `aws_dynamodb_table`: Database tables
-- `aws_cloudwatch_log_group`: Log groups
-- `aws_sns_topic`: Notification topic
-- `aws_iam_role`: IAM roles
-- `aws_lambda_function`: Lambda functions
+### `backend/streaming/stream_processor.py`
+- **Purpose**: Real-time sliding window statistical aggregator.
+- **Why Created**: Eliminates metric noise and false-positive spikes by calculating continuous rolling statistics over a 5-minute sliding window.
+- **What It Does**:
+  - Maintains a time-indexed queue of metric samples per host.
+  - Automatically evicts samples older than 300 seconds (5 minutes).
+  - Calculates rolling metrics: mean CPU, sustained memory utilization, 95th percentile ($P95$) network throughput, and anomaly indicators.
+  - Provides `get_window_stats(host_id)` for consumption by the `DecisionEngine`.
 
 ---
 
-### variables.tf
-**Purpose**: Terraform variable definitions
+## 10. Backend Linux Agents & Telemetry Collectors (`backend/agents/`)
 
-**Why Created**: To parameterize the Terraform configuration for flexibility.
+### `backend/agents/node_exporter_collector.py`
+- **Purpose**: Prometheus Node Exporter metric scraper and parser.
+- **Why Created**: Ingests industry-standard Linux hardware telemetry directly from Prometheus Node Exporter daemons running on port `9100`.
+- **What It Does**:
+  - Connects via HTTP to `http://<host_ip>:9100/metrics`.
+  - Parses OpenMetrics text format for key gauges:
+    - `node_cpu_seconds_total` (calculates user, system, iowait, and idle CPU percentages).
+    - `node_memory_MemTotal_bytes` and `node_memory_MemAvailable_bytes` (calculates true memory consumption).
+    - `node_filesystem_free_bytes` (calculates disk usage).
+    - `node_network_receive_bytes_total` and `node_network_transmit_bytes_total`.
+    - `node_load1` and `node_procs_running`.
+  - Formats data into a `Metric` entity and posts it to `/api/metrics/ingest`.
 
-**What It Does**:
-- Defines input variables
-- Sets default values
-- Specifies variable types
-- Includes descriptions
-- Allows customization without modifying main.tf
+### `backend/agents/fluent_bit_parser.py`
+- **Purpose**: Fluent Bit log shipping parser.
+- **Why Created**: Ingests high-frequency system and application logs streamed from Fluent Bit agent daemons running on Linux hosts.
+- **What It Does**:
+  - Parses structured JSON and standard syslog inputs.
+  - Normalizes timestamps to ISO 8601 UTC.
+  - Extracts severity levels using regex heuristics.
+  - Routes error and critical events directly to the alerting pipeline.
 
-**Key Variables**:
-- `region`: AWS region
-- `instance_type`: EC2 instance type
-- `environment`: Environment name (dev/prod)
-- `project_name`: Project identifier
-
----
-
-### outputs.tf
-**Purpose**: Terraform output definitions
-
-**Why Created**: To display important resource information after deployment.
-
-**What It Does**:
-- Defines output values
-- Displays resource ARNs
-- Shows endpoint URLs
-- Provides connection details
-- Useful for post-deployment configuration
-
-**Outputs**:
-- EC2 public IP
-- DynamoDB table names
-- SNS topic ARN
-- Lambda function ARNs
+### `backend/agents/vm_template_init.sh`
+- **Purpose**: Cloud-init bootstrap script for freshly provisioned Linux virtual machines.
+- **Why Created**: Automates the installation, configuration, and service startup of telemetry agents during the initial VM boot sequence.
+- **What It Does**:
+  - Updates apt package indexes.
+  - Downloads and installs Prometheus Node Exporter as a `systemd` service.
+  - Installs and configures Fluent Bit to tail `/var/log/syslog` and `/var/log/auth.log`.
+  - Registers the new VM with the central control plane via `POST /api/hosts/register`.
+  - Starts recurring heartbeats via cron or systemd timer.
 
 ---
 
-## Deploy Directory
+## 11. Backend Local Storage Schemas & Persistence (`backend/local_storage/`)
 
-### deploy_ec2.sh
-**Purpose**: Deploy application to EC2 instance
+### `backend/local_storage/hosts.json`
+- **Purpose**: Persistent inventory of all registered Linux virtual machines and bare-metal hosts.
+- **Structure**: JSON array of `Host` objects including IP addresses, CPU cores, RAM, lifecycle state (`RUNNING`, `DRAINING`, etc.), and last heartbeat timestamp.
 
-**Why Created**: To automate the deployment process to an EC2 server.
+### `backend/local_storage/resource_metrics.json`
+- **Purpose**: Time-series log of all ingested hardware metrics across all monitored hosts.
+- **Structure**: JSON array of `Metric` objects containing timestamp, host ID, CPU %, memory %, disk %, network I/O, load average, and process counts.
 
-**What It Does**:
-- Connects to EC2 instance via SSH
-- Installs dependencies (Docker, Docker Compose)
-- Copies application files
-- Sets up environment variables
-- Starts containers
-- Configures Nginx
-- Handles deployment errors
+### `backend/local_storage/scaling_events.json`
+- **Purpose**: Immutable audit log of all auto-scaling decisions, rule evaluations, and provisioning executions.
+- **Structure**: JSON array of `ScalingEvent` objects detailing timestamp, action (`SCALE_OUT`, `SCALE_IN`, `NO_ACTION`), trigger reason, snapshot metrics, and status.
 
-**Usage**:
-```bash
-./deploy_ec2.sh <EC2_HOST> <KEY_PATH>
-```
+### `backend/local_storage/incidents.json`
+- **Purpose**: Incident log recording host outages, watchdog expirations, and hypervisor provisioning failures.
+- **Structure**: JSON array of `Incident` objects containing timestamp, host ID, severity, title, detailed description, and acknowledgment state.
 
----
+### `backend/local_storage/provisioning.json`
+- **Purpose**: State store for tracking asynchronous VM provisioning tasks and their FSM transitions.
+- **Structure**: JSON array of `ProvisioningTask` objects tracking task ID, action, state (`CLONING`, `CONFIGURING_IP`, `RUNNING`, `FAILED`), and progress percentage.
 
-### setup_ec2.sh
-**Purpose**: Set up a new EC2 instance
+### `backend/local_storage/alerts.json`
+- **Purpose**: Legacy alert store for high-severity log events (`CRITICAL`, `ERROR`).
+- **Structure**: JSON array of alert records including log message, severity, timestamp, and notification dispatch status.
 
-**Why Created**: To automate the initial setup of an EC2 instance for the application.
-
-**What It Does**:
-- Updates system packages
-- Installs Docker and Docker Compose
-- Configures firewall rules
-- Sets up user permissions
-- Creates necessary directories
-- Configures SSH access
-
-**Usage**:
-```bash
-./setup_ec2.sh
-```
+### `backend/local_storage/stats.json`
+- **Purpose**: Aggregated cluster-wide log statistics.
+- **Structure**: JSON object tracking total logs, error counts, warning counts, critical counts, and last refresh timestamp.
 
 ---
 
-### lambda_deploy.sh
-**Purpose**: Deploy Lambda function to AWS
+## 12. Backend Integration Test Suite
 
-**Why Created**: To automate the deployment of the Lambda function.
-
-**What It Does**:
-- Packages Lambda function code
-- Creates deployment package
-- Uploads to AWS Lambda
-- Configures environment variables
-- Sets up IAM roles
-- Configures triggers
-
-**Usage**:
-```bash
-./lambda_deploy.sh
-```
+### `backend/test_auto_scaling.py`
+- **Purpose**: Comprehensive end-to-end integration and regression test suite.
+- **Why Created**: Validates all layers of the observability and auto-scaling platform in a single automated test run without external dependencies.
+- **What It Tests**:
+  1. **Phase 1**: Host Registration and Inventory Persistence (`POST /api/hosts/register`).
+  2. **Phase 2**: High-Resolution Metric Ingestion (`POST /api/metrics/ingest`).
+  3. **Phase 3**: Event Stream & Sliding Window Aggregation (`get_window_stats()`).
+  4. **Phase 4**: Decision Engine Under Sustained High Load (verifies `SCALE_OUT` trigger).
+  5. **Phase 5**: Cooldown Lock Enforcement (verifies subsequent evaluation blocked during cooldown).
+  6. **Phase 6**: Least-Utilized Workload Scheduling (verifies routing to healthiest host).
+  7. **Phase 7**: Transient Spike Rejection (verifies single spike does not trigger scale-out).
+  8. **Phase 8**: Host Heartbeat Watchdog & Incident Generation (verifies `DEGRADED` and `OFFLINE` transitions).
 
 ---
 
-### nginx.conf
-**Purpose**: Nginx configuration for EC2 deployment
+## 13. Frontend Application Architecture (`frontend/`)
 
-**Why Created**: To configure Nginx as a reverse proxy for the application on EC2.
+### `frontend/src/App.js`
+- **Purpose**: Root React component, top-level state manager, and routing controller.
+- **Why Created**: Manages global application state, authentication tokens, dark/light theme switching, and top-level navigation.
+- **What It Does**:
+  - Reads stored JWT tokens from browser `localStorage`.
+  - Renders `Login` component if unauthenticated.
+  - Renders `Dashboard` component if authenticated.
+  - Manages dark mode class toggles on the root document element.
 
-**What It Does**:
-- Configures reverse proxy to backend
-- Serves static frontend files
-- Enables SSL/TLS (if configured)
-- Sets up load balancing
-- Configures caching
-- Handles CORS
+### `frontend/src/components/Dashboard.js`
+- **Purpose**: Unified main dashboard shell with tabbed navigation.
+- **Why Created**: Seamlessly merges the new **Linux Observability & Auto-Scaling** views with the legacy **Log Analytics & Severity Analysis** views into a single unified dashboard.
+- **What It Does**:
+  - Provides tab navigation: **Linux Observability & Scaling** vs. **Log Analytics & Ingestion**.
+  - Renders `LinuxObservability` component under the observability tab.
+  - Renders summary statistics cards, interactive log charts (Pie, Line), recent logs table, search filters, and file upload modal under the log analytics tab.
+  - Implements auto-refresh interval polling every 10 seconds.
+  - Provides CSV log export functionality.
 
----
+### `frontend/src/components/LinuxObservability.js`
+- **Purpose**: Feature-rich, real-time Linux infrastructure observability and auto-scaling control panel.
+- **Why Created**: Delivers a modern UI for monitoring host health, viewing live resource metrics, inspecting scaling events, and executing manual scale-out/scale-in overrides.
+- **Key UI Sections**:
+  - **Cluster Overview Cards**: Displays Active VMs, Average CPU %, Average Memory %, Network Throughput, and Active Incidents with color-coded health badges.
+  - **Monitored Hosts & VM Table**: Displays host ID, hostname, IP address, OS, CPU cores, RAM, lifecycle status badges (`RUNNING`, `DRAINING`, `OFFLINE`), and quick actions.
+  - **Live Resource Utilization Charts**: Renders real-time CPU and Memory time-series line charts comparing multiple hosts simultaneously.
+  - **Auto-Scaling Control Panel**: Displays current policy thresholds, cooldown countdown, and buttons for manual **Scale Out (+1 VM)** and **Scale In (-1 VM)** actions.
+  - **Scaling Audit & Incident Log**: Displays real-time audit feed of scaling decisions, rule triggers, and host health incidents.
 
-## Docker Configuration
+### `frontend/src/components/Login.js`
+- **Purpose**: User authentication page component.
+- **Why Created**: Provides an interface for logging into the platform using username and password credentials.
+- **What It Does**:
+  - Submits credentials to `POST /api/login`.
+  - Stores returned JWT token in browser `localStorage`.
+  - Displays validation errors for invalid credentials.
 
-### docker-compose.yml (Root)
-**Purpose**: Orchestrate backend and frontend containers
+### `frontend/src/index.js`
+- **Purpose**: React application DOM entrypoint.
+- **What It Does**: Bootstraps the React virtual DOM into the root `#root` container using React 18 `createRoot`.
 
-**Why Created**: To simplify multi-container deployment with a single command.
+### `frontend/src/index.css` & `frontend/src/App.css`
+- **Purpose**: Global CSS styling, Tailwind imports, custom animations, and CSS variables.
+- **What It Does**: Declares Tailwind directives (`@tailwind base`, `@tailwind components`, `@tailwind utilities`), custom scrollbars, glowing status indicators, and glassmorphic card styles.
 
-**What It Does**:
-- Defines backend service (Flask)
-- Defines frontend service (React/Nginx)
-- Configures networking
-- Sets up volume mounts
-- Maps ports
-- Sets environment variables
-- Configures restart policies
+### `frontend/package.json`
+- **Purpose**: Frontend dependency and script configuration.
+- **What It Does**: Declares dependencies (`react`, `react-dom`, `axios`, `chart.js`, `react-chartjs-2`, `lucide-react`, `tailwindcss`) and scripts (`start`, `build`, `test`).
 
-**Services**:
-- **backend**: Flask API on port 5000
-- **frontend**: Nginx on port 80
+### `frontend/nginx.conf`
+- **Purpose**: Nginx web server configuration for production frontend container.
+- **What It Does**: Serves static production assets from `/usr/share/nginx/html`, enables gzip compression, configures cache headers, and provides fallback routing to `index.html` for single-page application routing.
 
-**Networks**:
-- `log-analyzer-network`: Bridge network for container communication
-
----
-
-## Summary
-
-### File Organization
-
-**Root Level**: Configuration and documentation
-**Backend**: Flask API and storage logic
-**Frontend**: React UI and components
-**CloudWatch**: AWS CloudWatch integration tools
-**Lambda**: Serverless log processing
-**Terraform**: Infrastructure as Code
-**Deploy**: Deployment automation scripts
-
-### Key Design Decisions
-
-1. **Dual Storage Mode**: Flexibility to use local files or AWS services
-2. **Containerization**: Docker for consistent deployment
-3. **Separation of Concerns**: Clear separation between frontend, backend, and storage
-4. **Configuration Management**: Environment variables for sensitive data
-5. **Modular Design**: Each file has a single, clear purpose
-
-### File Dependencies
-
-```
-Frontend (React)
-    ↓ HTTP API
-Backend (Flask)
-    ↓ Storage Adapter
-Storage Layer (Local Files or AWS Services)
-    ↓ Notifications
-Notification Service (Email/SMS/SNS)
-```
-
-### Security Considerations
-
-- `.env` file not in git (prevents credential exposure)
-- JWT authentication for API access
-- Secure file upload (type checking, size limits)
-- HTTPS recommended for production
-- IAM roles for AWS access
+### `frontend/Dockerfile`
+- **Purpose**: Multi-stage production container build for the React frontend.
+- **What It Does**:
+  - Stage 1: Builds the production React bundle using `node:18-alpine`.
+  - Stage 2: Copies static assets into `nginx:alpine` and applies `nginx.conf`.
 
 ---
 
-This documentation provides a complete understanding of every file in the AWS Cloud Log Analyzer project, explaining why each file was created, its purpose, and what it does in the system.
+## 14. CloudWatch & Serverless Processing (`cloudwatch/` & `lambda/`)
+
+### `cloudwatch/cloudwatch_sender.py`
+- **Purpose**: Standalone CLI utility for shipping local log files to AWS CloudWatch Logs.
+- **Why Created**: Enables hybrid architectures where on-premise log files are replicated into AWS CloudWatch log streams.
+- **What It Does**: Reads local log files, creates CloudWatch Log Groups and Log Streams if absent, and pushes log events via Boto3 `PutLogEvents` with sequence token management.
+
+### `cloudwatch/log_generator.py`
+- **Purpose**: Continuous log generator for CloudWatch integration testing.
+- **What It Does**: Emits formatted log streams at configurable intervals directly into stdout or files for ingestion testing.
+
+### `cloudwatch/setup_aws_resources.py`
+- **Purpose**: Automated AWS setup script.
+- **What It Does**: Creates necessary DynamoDB tables (`CloudLogs`, `CloudAlerts`, `CloudStats`), SNS topics, and IAM roles via Boto3 calls.
+
+### `lambda/log_processor.py`
+- **Purpose**: Serverless log processing AWS Lambda function.
+- **Why Created**: Provides serverless, event-driven log parsing inside the AWS cloud.
+- **What It Does**:
+  - Triggered by CloudWatch Logs subscription filters.
+  - Decompresses and decodes CloudWatch event data.
+  - Parses log severity and writes records into DynamoDB.
+  - Publishes SNS alerts when `CRITICAL` or `ERROR` logs are detected.
+
+---
+
+## 15. Infrastructure as Code & Deployment Automation (`terraform/` & `deploy/`)
+
+### `terraform/main.tf`
+- **Purpose**: Declarative Terraform configuration provisioning AWS infrastructure.
+- **Why Created**: Implements Infrastructure as Code (IaC) for reproducible, version-controlled cloud infrastructure.
+- **What It Provisions**:
+  - EC2 instance for hosting the platform backend and frontend.
+  - DynamoDB tables (`CloudLogs`, `CloudAlerts`, `CloudStats`, `Hosts`, `ResourceMetrics`).
+  - SNS topic for critical alerts and email/SMS subscriptions.
+  - CloudWatch Log Groups.
+  - IAM roles and policies with least-privilege permissions.
+  - Security Groups with ingress rules for SSH (22), HTTP (80), and API (5000).
+
+### `terraform/variables.tf` & `terraform/outputs.tf`
+- **Purpose**: Terraform input variable declarations and output endpoints.
+- **What It Does**: Parameterizes AWS region, instance types, and project names; outputs public IP addresses, table names, and topic ARNs.
+
+### `deploy/setup_ec2.sh`
+- **Purpose**: Bash script for bootstrapping a fresh Ubuntu EC2 instance.
+- **What It Does**: Installs Docker, Docker Compose, Git, and updates system packages.
+
+### `deploy/deploy_ec2.sh`
+- **Purpose**: Automated application deployment script for EC2.
+- **What It Does**: Pulls latest repository changes, builds Docker containers, and executes `docker-compose up -d`.
+
+### `deploy/lambda_deploy.sh` & `deploy/lambda_deploy.ps1`
+- **Purpose**: Linux/macOS Bash and Windows PowerShell packaging scripts for the AWS Lambda function.
+- **What It Does**: Zips `lambda/log_processor.py` with its dependencies and uploads the package to AWS Lambda via AWS CLI.
+
+---
+
+## 16. Documentation Catalog
+
+- **`README.md`**: Master onboarding and developer guide featuring quickstart instructions, system architecture diagrams, environment variable reference, and API endpoint documentation.
+- **`PROJECT_DOCUMENTATION.md`**: In-depth technical architecture manual covering the 21 major architectural subsystems, data flows, and design decisions.
+- **`PROJECT_DESCRIPTION_AND_EDGE_CASES.md`**: Comprehensive reference documenting all failure modes, edge cases (transient spikes, flapping, hypervisor timeouts, split-brain), and operational mitigations.
+- **`FILE_EXPLANATIONS.md`**: This document — the definitive reference for every single file in the repository.
+- **`docs/ARCHITECTURE_AND_TECHNOLOGY_GUIDE.md`**: Clean, high-level architecture and technology guide tailored for presentations, viva examinations, interviews, and rapid 5–10 minute architectural comprehension.
+

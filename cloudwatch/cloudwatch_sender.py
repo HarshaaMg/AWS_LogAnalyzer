@@ -50,8 +50,12 @@ def send_logs_to_cloudwatch(log_file='application.log'):
     create_log_stream()
     
     if not os.path.exists(log_file):
-        print(f"Log file {log_file} not found")
-        return
+        fallback = os.path.join(os.path.dirname(__file__), '..', 'backend', 'logs', os.path.basename(log_file))
+        if os.path.exists(fallback):
+            log_file = fallback
+        else:
+            print(f"Log file {log_file} not found")
+            return
     
     print(f"Reading logs from {log_file}...")
     

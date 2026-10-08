@@ -239,3 +239,167 @@ resource "aws_apigatewayv2_stage" "prod" {
   name        = "prod"
   auto_deploy = true
 }
+
+# ==============================================================================
+# Linux Observability & Auto-Scaling Tables
+# ==============================================================================
+resource "aws_dynamodb_table" "cloud_hosts" {
+  name         = "CloudHosts"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "host_id"
+
+  attribute {
+    name = "host_id"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "CloudHosts"
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "cloud_metrics" {
+  name         = "CloudResourceMetrics"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "host_id"
+  range_key    = "timestamp"
+
+  attribute {
+    name = "host_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "CloudResourceMetrics"
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "cloud_scaling_events" {
+  name         = "CloudScalingEvents"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "event_id"
+  range_key    = "timestamp"
+
+  attribute {
+    name = "event_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "CloudScalingEvents"
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "cloud_incidents" {
+  name         = "CloudIncidents"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "incident_id"
+  range_key    = "start_time"
+
+  attribute {
+    name = "incident_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "start_time"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "CloudIncidents"
+    Environment = var.environment
+  }
+}
+
+resource "aws_dynamodb_table" "cloud_provisioning" {
+  name         = "CloudProvisioning"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "provisioning_id"
+  range_key    = "started_at"
+
+  attribute {
+    name = "provisioning_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "started_at"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "CloudProvisioning"
+    Environment = var.environment
+  }
+}
+
+# Security Group for Auto-Scaled Linux VMs
+resource "aws_security_group" "linux_vm_sg" {
+  name        = "linux-observability-vm-sg"
+  description = "Security group for auto-scaled Linux VMs"
+
+  ingress {
+    description = "Node Exporter metrics"
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  ingress {
+    description = "SSH access"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "LinuxObservabilityVM"
+    Environment = var.environment
+  }
+}
+
+# IAM Role & Instance Profile for EC2 Linux Instances
+resource "aws_iam_role" "ec2_worker_role" {
+  name = "ec2-linux-observability-worker-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "ec2_worker_profile" {
+  name = "LogAnalyzerInstanceProfile"
+  role = aws_iam_role.ec2_worker_role.name
+}
